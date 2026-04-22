@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: bdlab2_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: bdlab2
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./исходные данные:/csv_data
+      - ./init_postgres.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - bdlab2_net
+
+  spark:
+    image: jupyter/pyspark-notebook:latest
+    container_name: bdlab2_spark
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=bdlab2
+    ports:
+      - "8888:8888"
+      - "4040:4040"
+    volumes:
+      - ./:/home/jovyan/work
+    networks:
+      - bdlab2_net
+    depends_on:
+      - postgres
+      - clickhouse
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: bdlab2_clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - bdlab2_net
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+
+networks:
+  bdlab2_net:
+    driver: bridge

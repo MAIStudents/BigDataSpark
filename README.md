@@ -85,3 +85,106 @@
 7. Код Apache Spark трансформации данных из снежинки/звезды в отчеты в Neo4j.
 8. Код Apache Spark трансформации данных из снежинки/звезды в отчеты в MongoDB.
 9. Код Apache Spark трансформации данных из снежинки/звезды в отчеты в Valkey.
+
+---
+
+# Инструкция по запуску лабораторной работы №2
+
+## 1. Запуск инфраструктуры
+
+```bash
+cd BDLab2
+docker-compose up -d
+```
+
+Дождитесь старта всех контейнеров (~30 сек):
+- **PostgreSQL** — `localhost:5432`
+- **JupyterLab + Spark** — `localhost:8888` (токен: `bdlab2`)
+- **ClickHouse** — `localhost:8123`
+
+PostgreSQL автоматически создаст таблицу `mock_data` и загрузит все 10 CSV-файлов через `init_postgres.sql`.
+
+Проверить загрузку данных (через DBeaver или psql):
+```sql
+SELECT COUNT(*) FROM mock_data;  -- должно быть 10000
+```
+
+---
+
+## 2. Запуск ETL: mock_data → Star Schema (PostgreSQL)
+
+Открыть терминал внутри контейнера Spark:
+```bash
+docker exec -it bdlab2_spark bash
+```
+
+Запустить джоб:
+```bash
+cd /home/jovyan/work
+spark-submit \
+  --packages org.postgresql:postgresql:42.6.0 \
+  etl_star_schema.py
+```
+
+После выполнения в PostgreSQL появятся таблицы:
+- `dim_customer`, `dim_seller`, `dim_product`
+- `dim_store`, `dim_supplier`, `dim_date`
+- `fact_sales`
+
+---
+
+## 3. Запуск ETL: Star Schema → Отчёты (ClickHouse)
+
+```bash
+docker exec -it bdlab2_spark bash
+cd /home/jovyan/work
+spark-submit \
+  --packages org.postgresql:postgresql:42.6.0,com.clickhouse:clickhouse-jdbc:0.4.6 \
+  etl_clickhouse_reports.py
+```
+
+После выполнения в ClickHouse появятся 6 таблиц:
+- `report_products`
+- `report_customers`
+- `report_time`
+- `report_stores`
+- `report_suppliers`
+- `report_quality`
+
+---
+
+## 4. Проверка отчётов в ClickHouse
+
+### Через HTTP API (curl):
+```bash
+# Топ-10 продуктов
+curl "http://localhost:8123/?query=SELECT+product_name,total_units_sold,total_revenue+FROM+report_products+WHERE+is_top10=true+ORDER+BY+total_units_sold+DESC"
+
+# Топ-10 клиентов
+curl "http://localhost:8123/?query=SELECT+customer_first_name,customer_last_name,total_spent+FROM+report_customers+WHERE+is_top10=true+ORDER+BY+total_spent+DESC"
+
+# Месячные тренды
+curl "http://localhost:8123/?query=SELECT+year,month,monthly_revenue,avg_order_size+FROM+report_time+ORDER+BY+year,month"
+
+# Топ-5 магазинов
+curl "http://localhost:8123/?query=SELECT+store_name,total_revenue+FROM+report_stores+WHERE+is_top5=true+ORDER+BY+total_revenue+DESC"
+
+# Топ-5 поставщиков
+curl "http://localhost:8123/?query=SELECT+supplier_name,total_revenue,avg_product_price+FROM+report_suppliers+WHERE+is_top5=true+ORDER+BY+total_revenue+DESC"
+
+# Качество продукции
+curl "http://localhost:8123/?query=SELECT+product_name,avg_rating,avg_reviews,total_units_sold+FROM+report_quality+ORDER+BY+avg_rating+DESC+LIMIT+10"
+```
+
+### Через DBeaver:
+Подключение к ClickHouse: `Host: localhost, Port: 8123, Database: default`
+
+---
+
+## 5. Остановка
+
+```bash
+docker-compose down
+# Удалить данные (опционально):
+docker-compose down -v
+```
