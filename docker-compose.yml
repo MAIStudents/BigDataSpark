@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: postgres-lab2
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres-db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./data:/data/mock_data:ro
+      - ./sql/postgres:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    networks:
+      - bigdata
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres-db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  spark:
+    build:
+      context: .
+      dockerfile: Dockerfile.spark
+    container_name: spark
+    volumes:
+      - ./scripts:/opt/spark-jobs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - bigdata
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: clickhouse
+    environment:
+      CLICKHOUSE_USER: spark
+      CLICKHOUSE_PASSWORD: spark
+      CLICKHOUSE_DB: sparkdb
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    networks:
+      - bigdata
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8123/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+networks:
+  bigdata:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  clickhouse_data:

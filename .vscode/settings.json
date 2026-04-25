@@ -1,0 +1,39 @@
+{
+    "sqltools.connections": [
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "postgres-lab2",
+            "database": "postgres-for-lab2",
+            "username": "postgres",
+            "password": "postgres"
+        },
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "postgres",
+            "database": "postgres-db",
+            "username": "postgres",
+            "password": "postgres"
+        },
+        {
+            "server": "http://localhost",
+            "port": 8123,
+            "database": "sparkdb",
+            "useJWT": false,
+            "requestTimeout": 30000,
+            "enableTls": false,
+            "previewLimit": 50,
+            "password": "spark",
+            "username": "spark",
+            "driver": "ClickHouse",
+            "name": "click"
+        }
+    ]
+}

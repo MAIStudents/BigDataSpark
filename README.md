@@ -85,3 +85,37 @@
 7. Код Apache Spark трансформации данных из снежинки/звезды в отчеты в Neo4j.
 8. Код Apache Spark трансформации данных из снежинки/звезды в отчеты в MongoDB.
 9. Код Apache Spark трансформации данных из снежинки/звезды в отчеты в Valkey.
+
+Выполнены все основыне пункты, без опциональных
+
+В папке scripts - etl пайплайны (весь код spark)
+
+В папке sql - скрипт для инициализации csv в sql
+
+В папке data - мокрые csv данные
+
+Запуск проекта 
+
+```bash
+docker-compose up -d --build
+```
+
+ETL пайплайн для postgresql
+```bash
+docker exec spark spark-submit \
+  --master "local[*]" \
+  --packages "org.postgresql:postgresql:42.7.3" \
+  /opt/spark-jobs/01_star.py
+```
+
+ETL пайплайн для clickhouse
+```bash
+docker exec spark spark-submit \
+  --master "local[*]" \
+  --packages "org.postgresql:postgresql:42.7.3" \
+  /opt/spark-jobs/02_clickhouse.py
+```
+
+Настройки для postgresql - логин(postgres), пароль(postgres), бд(postgres-db)
+
+Настройки для clickhouse - логин(spark), пароль(spark), пароль(sparkdb)
