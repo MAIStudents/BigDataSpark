@@ -85,3 +85,67 @@
 7. Код Apache Spark трансформации данных из снежинки/звезды в отчеты в Neo4j.
 8. Код Apache Spark трансформации данных из снежинки/звезды в отчеты в MongoDB.
 9. Код Apache Spark трансформации данных из снежинки/звезды в отчеты в Valkey.
+
+---
+
+## Сборка и запуск (Spring Boot + Swagger)
+
+Приложение реализовано как Spring Boot REST API. ETL-пайплайн запускается через HTTP-запросы.
+
+### Требования
+
+- Docker и Docker Compose
+- JDK 21 + Maven 3.9+ (только для локальной сборки)
+
+### 1. Запуск инфраструктуры
+
+```bash
+docker compose up -d
+```
+
+Команда поднимает:
+- **PostgreSQL 17** (`localhost:5432`, БД `lr2`, пользователь `postgres` / пароль `postgres`)
+- **Liquibase** — автоматически применяет миграции (схема `snowflake`, таблица `public.mock_data`)
+- **ClickHouse** (`localhost:8123`, БД `analytics`, пользователь `lr2` / пароль `lr2`)
+- **API-сервис** (`localhost:8080`) — Spring Boot приложение с встроенным Spark
+
+Дождитесь, когда все контейнеры перейдут в статус `healthy` / `running`:
+
+```bash
+docker compose ps
+```
+
+### 2. Запуск ETL через Swagger UI
+
+Откройте в браузере: **http://localhost:8080/swagger-ui.html**
+
+Выполните три шага по порядку:
+
+**Шаг 1 — Загрузка CSV в PostgreSQL**
+
+`POST /api/v1/upload_mock` — загрузите все 10 файлов `mock_data/MOCK_DATA*.csv` по одному (поле `file`, тип `multipart/form-data`). Итого в таблице `public.mock_data` должно быть 10 000 строк.
+
+**Шаг 2 — ETL: mock_data → схема snowflake (PostgreSQL)**
+
+`POST /api/v1/mock_to_snowflake` — Spark читает `public.mock_data`, строит staging-таблицы, выполняет MERGE в измерения и загружает `snowflake.fact_sales`.
+
+**Шаг 3 — ETL: snowflake → витрины ClickHouse**
+
+`POST /api/v1/snowflake_to_clickhouse` — Spark читает схему `snowflake` из PostgreSQL и записывает 6 аналитических витрин в ClickHouse (`analytics.*`).
+
+### 3. Проверка результата
+
+После успешного выполнения всех трёх шагов в ClickHouse появятся таблицы:
+
+| Таблица | Содержимое |
+|---|---|
+| `analytics.sales_by_product` | Топ-10 продуктов по выручке |
+| `analytics.sales_by_customer` | Топ-10 клиентов по сумме покупок |
+| `analytics.sales_by_time` | Выручка по месяцам и годам |
+| `analytics.sales_by_store` | Топ-5 магазинов по выручке |
+| `analytics.sales_by_supplier` | Топ-5 поставщиков по выручке |
+| `analytics.product_quality` | Рейтинг и корреляция продаж |
+
+Проверить данные можно через DBeaver, подключившись к ClickHouse (`localhost:8123`), или через API-документацию.
+
+Spark **встроен** в Spring Boot приложение как библиотека — никакого отдельного кластера не нужно. Spark-джобы запускаются **синхронно** по REST-вызову и работают в режиме `local[*]`.

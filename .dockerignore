@@ -1,0 +1,7 @@
+target
+.git
+.idea
+.run
+*.iml
+mock_data
+**/.DS_Store

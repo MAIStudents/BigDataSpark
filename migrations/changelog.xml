@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                        http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.3.xsd">
+
+    <include file="changesets/2026-03-29__01_init_schema.sql" relativeToChangelogFile="true"/>
+    <include file="changesets/2026-03-29-02-spark-indexes.sql" relativeToChangelogFile="true"/>
+    <include file="changesets/2026-03-30__public_mock_data.sql" relativeToChangelogFile="true"/>
+</databaseChangeLog>

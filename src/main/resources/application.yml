@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: bigdataspark
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+
+app:
+  spark:
+    master: local[*]
+  datasource:
+    postgres:
+      url: jdbc:postgresql://localhost:5432/lr2
+      username: postgres
+      password: postgres
+      driver-class-name: org.postgresql.Driver
+      hikari:
+        maximum-pool-size: 4
+        pool-name: bigdataspark-pg
+    clickhouse:
+      url: jdbc:clickhouse:http://localhost:8123/analytics?compress=0
+      username: lr2
+      password: lr2
+      driver-class-name: com.clickhouse.jdbc.ClickHouseDriver
+      hikari:
+        maximum-pool-size: 4
+        pool-name: bigdataspark-ch
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+server:
+  port: 8080

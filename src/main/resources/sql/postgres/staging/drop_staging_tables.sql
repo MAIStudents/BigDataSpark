@@ -1,0 +1,10 @@
+DROP TABLE IF EXISTS public.etl_stg_fact;
+DROP TABLE IF EXISTS public.etl_stg_product;
+DROP TABLE IF EXISTS public.etl_stg_supplier;
+DROP TABLE IF EXISTS public.etl_stg_customer;
+DROP TABLE IF EXISTS public.etl_stg_seller;
+DROP TABLE IF EXISTS public.etl_stg_store;
+DROP TABLE IF EXISTS public.etl_stg_pet;
+DROP TABLE IF EXISTS public.etl_stg_address;
+DROP TABLE IF EXISTS public.etl_stg_city;
+DROP TABLE IF EXISTS public.etl_stg_country;
