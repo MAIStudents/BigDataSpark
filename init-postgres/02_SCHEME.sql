@@ -19,7 +19,8 @@ CREATE TABLE dim_seller (
 
 CREATE TABLE dim_product (
     product_id SERIAL PRIMARY KEY,
-    product_name VARCHAR(255) UNIQUE,
+    product_fingerprint VARCHAR(32) UNIQUE NOT NULL,
+    product_name VARCHAR(255),
     product_category VARCHAR(100),
     product_brand VARCHAR(100),
     product_material VARCHAR(100),
@@ -35,7 +36,7 @@ CREATE TABLE dim_product (
 
 CREATE TABLE dim_store (
     store_id SERIAL PRIMARY KEY,
-    store_name VARCHAR(255) UNIQUE,
+    store_name VARCHAR(255) UNIQUE NOT NULL,
     store_location VARCHAR(255),
     store_city VARCHAR(100),
     store_state VARCHAR(100),
@@ -46,7 +47,7 @@ CREATE TABLE dim_store (
 
 CREATE TABLE dim_supplier (
     supplier_id SERIAL PRIMARY KEY,
-    supplier_name VARCHAR(255) UNIQUE,
+    supplier_name VARCHAR(255) UNIQUE NOT NULL,
     supplier_contact VARCHAR(100),
     supplier_email VARCHAR(100),
     supplier_phone VARCHAR(20),

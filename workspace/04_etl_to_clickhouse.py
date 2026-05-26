@@ -14,7 +14,9 @@ ch_url = "jdbc:clickhouse://clickhouse:8123/reports"
 ch_props = {
     "user": "pyspark_user",
     "password": "pyspark_password",
-    "driver": "com.clickhouse.jdbc.ClickHouseDriver"
+    "driver": "com.clickhouse.jdbc.ClickHouseDriver",
+    "compress": "false",                      
+    "decompress": "false"
 }
 
 
