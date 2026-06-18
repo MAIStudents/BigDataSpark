@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: spark_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - spark_postgres_data:/var/lib/postgresql/data
+      - ./исходные данные:/data/исходные данные:ro
+      - ./init-postgres:/docker-entrypoint-initdb.d # Авто-инициализация базы
+    networks:
+      - bigdata_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: spark_clickhouse
+    ports:
+      - "8123:8123" # HTTP порт для JDBC драйвера и DBeaver
+      - "9000:9000" # Нативный клиентский порт
+    environment:
+      - CLICKHOUSE_DB=reports
+      - CLICKHOUSE_USER=pyspark_user
+      - CLICKHOUSE_PASSWORD=pyspark_password
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - bigdata_network
+
+  spark:
+    image: jupyter/pyspark-notebook:latest
+    container_name: spark_jupyter
+    ports:
+      - "8888:8888" # Jupyter веб-интерфейс
+      - "4040:4040" # Spark UI для трекинга задач
+    environment:
+      JUPYTER_ENABLE_LAB: "yes"
+    user: root
+    volumes:
+      - ./workspace:/home/jovyan/work
+    networks:
+      - bigdata_network
+
+networks:
+  bigdata_network:
+    driver: bridge
+
+volumes:
+  spark_postgres_data:
+  clickhouse_data:
