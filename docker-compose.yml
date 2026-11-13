@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: bigdataspark_postgres
+    environment:
+      POSTGRES_DB: bigdataspark
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d:ro
+      - ./исходные данные:/data:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d bigdataspark"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    container_name: bigdataspark_clickhouse
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: clickhouse
+      CLICKHOUSE_DB: reports
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --password $$CLICKHOUSE_PASSWORD --query 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  spark:
+    build: .
+    container_name: bigdataspark_etl
+    environment:
+      SPARK_LOCAL_IP: 127.0.0.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    volumes:
+      - ./jobs:/opt/jobs:ro
+    restart: "no"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - /opt/spark/bin/spark-submit --master 'local[4]' /opt/jobs/01_mock_to_star.py && /opt/spark/bin/spark-submit --master 'local[4]' /opt/jobs/02_star_to_reports.py
+
+volumes:
+  postgres_data:
+  clickhouse_data:
