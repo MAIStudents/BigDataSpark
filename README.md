@@ -1,5 +1,190 @@
 # BigDataSpark
 
+Анализ больших данных - лабораторная работа №2 - ETL реализованный с помощью Spark.
+
+Выполнил: Крючков Артемий Владимирович, группа М8О-205СВ-25.
+
+## Как запустить лабораторную работу
+
+Требуется установленный Docker (при первой сборке нужен интернет: качаются образы и JDBC-драйверы с Maven Central).
+
+Из корня репозитория:
+
+```bash
+docker compose up -d --build
+```
+
+При старте автоматически выполняется:
+
+1. Поднимается PostgreSQL 17 (порт на хосте 5433). Создаётся таблица `mock_data`, через `COPY` импортируются все 10 файлов `исходные данные/MOCK_DATA(*).csv` (10000 строк), затем выполняется DDL модели звезда.
+2. Поднимается ClickHouse 24.8 (порт на хосте 8123), создаётся база `reports`.
+3. После готовности обеих БД запускается контейнер Spark (PySpark 3.5, `spark-submit --master local[4]`) и выполняет две джобы:
+   - `jobs/01_mock_to_star.py` — читает `mock_data` из PostgreSQL, строит измерения и факты, пишет модель звезда обратно в PostgreSQL;
+   - `jobs/02_star_to_reports.py` — читает звезду из PostgreSQL и создаёт 6 отчётов-витрин в ClickHouse (таблицы MergeTree в базе `reports`).
+
+Готовность джоб можно проверить логами (контейнер `bigdataspark_etl` должен завершиться со статусом Exited (0)):
+
+```bash
+docker compose ps -a
+docker logs bigdataspark_etl
+```
+
+Повторный запуск ETL без пересоздания баз:
+
+```bash
+docker compose run --rm spark
+```
+
+## Подключение (DBeaver)
+
+PostgreSQL:
+
+| Параметр | Значение     |
+| -------- | ------------ |
+| Host     | localhost    |
+| Port     | 5433         |
+| Database | bigdataspark |
+| User     | postgres     |
+| Password | postgres     |
+
+ClickHouse:
+
+| Параметр | Значение   |
+| -------- | ---------- |
+| Host     | localhost  |
+| Port     | 8123       |
+| Database | reports    |
+| User     | default    |
+| Password | clickhouse |
+
+## Проверка результата
+
+Модель звезда в PostgreSQL: `fact_sales` + `dim_date`, `dim_customer`, `dim_seller`, `dim_product`, `dim_store`, `dim_supplier`. Суррогатные ключи назначает Spark (`row_number`); исходные `id`/`sale_*_id` в данных не уникальны, поэтому измерения строятся по полным наборам атрибутов.
+
+Контрольные значения:
+
+```sql
+SELECT count(*) FROM mock_data;
+SELECT count(*) FROM fact_sales;
+SELECT sum(total_price) FROM fact_sales;
+```
+
+Ожидается: 10000, 10000, 2529852.12.
+
+Витрины в ClickHouse:
+
+| Отчёт                  | Таблица                       | Строк |
+| ---------------------- | ----------------------------- | ----: |
+| Витрина по продуктам  | reports.rpt_product_sales    |  3233 |
+| Витрина по клиентам   | reports.rpt_customer_sales   | 10000 |
+| Витрина по времени    | reports.rpt_time_sales       |    12 |
+| Витрина по магазинам  | reports.rpt_store_sales      | 10000 |
+| Витрина по поставщикам | reports.rpt_supplier_sales  | 10000 |
+| Витрина качества      | reports.rpt_product_quality  |  3233 |
+
+Примеры запросов по витринам:
+
+Топ-10 самых продаваемых продуктов:
+
+```sql
+SELECT product_name, product_brand, sales_cnt, total_revenue
+FROM reports.rpt_product_sales
+ORDER BY sales_cnt DESC, total_revenue DESC
+LIMIT 10;
+```
+
+Выручка по категориям продуктов:
+
+```sql
+SELECT product_category, sum(total_revenue) AS revenue, sum(sales_cnt) AS sales_cnt
+FROM reports.rpt_product_sales
+GROUP BY product_category
+ORDER BY revenue DESC;
+```
+
+Топ-10 клиентов с наибольшей суммой покупок:
+
+```sql
+SELECT first_name, last_name, email, country, total_revenue
+FROM reports.rpt_customer_sales
+ORDER BY total_revenue DESC
+LIMIT 10;
+```
+
+Распределение клиентов по странам:
+
+```sql
+SELECT country, count(*) AS customers
+FROM reports.rpt_customer_sales
+GROUP BY country
+ORDER BY customers DESC;
+```
+
+Месячные тренды продаж:
+
+```sql
+SELECT year, month, month_name, sales_cnt, total_revenue
+FROM reports.rpt_time_sales
+ORDER BY year, month;
+```
+
+Топ-5 магазинов с наибольшей выручкой:
+
+```sql
+SELECT store_name, store_city, store_country, total_revenue
+FROM reports.rpt_store_sales
+ORDER BY total_revenue DESC
+LIMIT 5;
+```
+
+Топ-5 поставщиков с наибольшей выручкой:
+
+```sql
+SELECT supplier_name, supplier_country, total_revenue, avg_product_price
+FROM reports.rpt_supplier_sales
+ORDER BY total_revenue DESC
+LIMIT 5;
+```
+
+Корреляция между рейтингом и объёмом продаж:
+
+```sql
+SELECT corr(avg_rating, sales_cnt) AS correlation
+FROM reports.rpt_product_quality;
+```
+
+Продукты с наивысшим и наименьшим рейтингом:
+
+```sql
+SELECT * FROM reports.rpt_product_quality ORDER BY avg_rating DESC, avg_reviews DESC LIMIT 10;
+SELECT * FROM reports.rpt_product_quality ORDER BY avg_rating ASC, avg_reviews DESC LIMIT 10;
+```
+
+## Управление
+
+```bash
+docker compose stop
+docker compose down
+docker compose down -v && docker compose up -d --build
+```
+
+`down -v` удаляет данные и запускает полную переинициализацию с нуля.
+
+## Состав решения
+
+| Файл                         | Назначение                                                          |
+| ---------------------------- | ------------------------------------------------------------------- |
+| `docker-compose.yml`         | PostgreSQL 17, ClickHouse 24.8, контейнер Spark с автозапуском ETL   |
+| `Dockerfile`                 | Образ Spark 3.5 (PySpark) с JDBC-драйверами PostgreSQL и ClickHouse |
+| `init/01_mock_data.sql`      | таблица-источник `mock_data` и импорт 10 CSV                        |
+| `init/02_ddl.sql`            | DDL модели звезда в PostgreSQL                                      |
+| `jobs/01_mock_to_star.py`    | Spark-джоба: mock_data → звезда в PostgreSQL                        |
+| `jobs/02_star_to_reports.py` | Spark-джоба: звезда → 6 отчётов в ClickHouse                        |
+
+---
+
+## Исходное задание
+
 Анализ больших данных - лабораторная работа №2 - ETL реализованный с помощью Spark
 
 Одним из самых популярных фреймворков для работы с Big Data является Apache Spark. Apache Spark - мощный фреймворк, который предлагает широкий набор функциональности для простого написания ETL-пайплайнов.
